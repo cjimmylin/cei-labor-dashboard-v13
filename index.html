@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI &amp; Labor: Global Conversation Map</title>
+    <meta name="description" content="Interactive dashboard exploring the global discourse on AI and labor through heatmaps, geographic analysis, and temporal trends.">
+
+    <!-- S9 M9: inline SVG favicon — stylized "L" in dashboard accent color, no external file needed -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230d1117'/%3E%3Cpath d='M18 14 h8 v28 h22 v8 h-30 z' fill='%2358a6ff'/%3E%3C/svg%3E">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap 5.3.3 (CSS only) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+          crossorigin="anonymous">
+
+    <!-- Dashboard Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Skip Link -->
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <!-- Header -->
+    <header class="site-header" role="banner">
+        <div>
+            <div class="header-title">AI &amp; Labor: Global Conversation Map</div>
+            <div class="header-subtitle">Cross-referencing policy statements and academic research on artificial intelligence and the future of work</div>
+        </div>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark theme">
+            <span class="theme-icon" aria-hidden="true">&#9790;</span>
+            <span class="theme-label">Theme</span>
+        </button>
+    </header>
+
+    <!-- Project Explainer (AC2: <=60 words for first-time readers) -->
+    <div class="explainer-card" role="region" aria-label="About this dashboard">
+        <p><strong>What is this?</strong> This dashboard maps the global discourse on AI and labor -- analyzing how policy statements and academic research address automation, surveillance, collective bargaining, and worker protection across 12 regions. It draws from the <abbr title="A global database of ~3,054 AI governance statements and ~2,368 academic papers">Tapestry database</abbr>, classifying documents by 17 labor sub-themes using English-language keyword heuristics.</p>
+    </div>
+
+    <!-- Surveillance Rescore Callout (S16 headline finding) -->
+    <details class="surveillance-callout" open>
+        <summary><strong>v13 Headline:</strong> Surveillance theme precision corrected from 51.3% to 87.2%</summary>
+        <div class="callout-body">
+            <p>The prior dashboard (v12) reported surveillance theme <abbr title="The fraction of items classified as surveillance-related that are genuinely about labor surveillance, as judged by the keyword heuristic">heuristic-precision</abbr> of 51.3%, raising questions about theme retention. A Session 16 post-hoc exploratory reanalysis revealed this was an artifact of a 1,500-character scan window -- the audit script only examined the first 1,500 chars of each extract, missing labor-surveillance context that appeared deeper in the text.</p>
+            <p>Widening to the full 10,000-character extract body corrected 42 <abbr title="Items initially classified as False Positives that were reclassified as True Positives after the window fix">FP&#8594;TP</abbr> flips with zero regressions. Full-population <abbr title="Heuristic-precision: 87.2% (n=117 census, no confidence interval -- this is a census count, not a sample estimate)">heuristic-precision</abbr>: 87.2% (102/117 items). Within-sample (n=60): 91.7% (Wilson 95% CI [81.9%, 96.4%]).</p>
+            <p><strong>What changed v12&#8594;v13:</strong> Scan window widened from 1,500 to 10,000 chars. <strong>What did NOT change:</strong> corpus, keyword patterns, classification rules, statement count, all non-surveillance theme classifications.</p>
+            <p class="callout-residual">15 items remain flagged as candidate false positives. 2 are likely heuristic-missed true positives (TUC AI Bill, CCOO algorithmic management guide); 13 are likely genuine false positives requiring human adjudication.</p>
+        </div>
+    </details>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav" role="tablist" aria-label="Dashboard sections">
+        <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="pane-summary" data-tab="summary">Executive Summary</button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="pane-heatmap" data-tab="heatmap">Region &times; Theme</button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="pane-geographic" data-tab="geographic">Geographic</button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="pane-temporal" data-tab="temporal">Temporal Trends</button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="pane-voicegap" data-tab="voicegap">Voice Gap</button>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content" id="main-content">
+
+        <!-- KPI Grid -->
+        <div class="kpi-grid" aria-label="Key performance indicators">
+            <div class="kpi-card">
+                <div class="kpi-label">Total Documents</div>
+                <div class="kpi-value" id="kpi-total">--</div>
+                <div class="kpi-detail" id="kpi-total-detail"></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Statements</div>
+                <div class="kpi-value" id="kpi-statements">--</div>
+                <div class="kpi-detail">Policy &amp; position documents</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Papers</div>
+                <div class="kpi-value" id="kpi-papers">--</div>
+                <div class="kpi-detail">Academic literature</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Countries</div>
+                <div class="kpi-value" id="kpi-countries">--</div>
+                <div class="kpi-detail" id="kpi-countries-detail"></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Themes</div>
+                <div class="kpi-value" id="kpi-themes">--</div>
+                <div class="kpi-detail">Distinct topic categories</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Date Range</div>
+                <div class="kpi-value" id="kpi-daterange">--</div>
+                <div class="kpi-detail" id="kpi-daterange-detail"></div>
+            </div>
+        </div>
+
+        <!-- Tab 1: Executive Summary -->
+        <section id="pane-summary" class="tab-pane active" role="tabpanel" aria-labelledby="tab-summary">
+            <h2 class="section-title">Key Findings</h2>
+            <div class="findings-grid" id="findings-grid"></div>
+
+            <div id="annotations-summary-findings" class="annotations-container"></div>
+
+            <div class="chart-grid-2">
+                <div class="chart-card">
+                    <h3>Top Themes</h3>
+                    <div class="chart-container" id="chart-themes-bar"></div>
+                    <div id="annotations-summary-themes" class="annotations-container"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Source Breakdown</h3>
+                    <div class="chart-container" id="chart-source-pie"></div>
+                </div>
+            </div>
+            <div id="annotations-summary-acceleration" class="annotations-container"></div>
+        </section>
+
+        <!-- Tab 2: Region x Theme Heatmap -->
+        <section id="pane-heatmap" class="tab-pane" role="tabpanel" aria-labelledby="tab-heatmap">
+            <h2 class="section-title">Region &times; Theme Heatmap</h2>
+            <p class="section-desc">Explore the intersection of geographic regions and thematic categories. Toggle between raw counts and normalized views to reveal structural patterns.</p>
+
+            <div class="heatmap-controls">
+                <div class="toggle-group" role="radiogroup" aria-label="Normalization mode">
+                    <span class="toggle-group-label">Normalize</span>
+                    <button class="toggle-btn active" data-norm="raw" role="radio" aria-checked="true">Raw Counts</button>
+                    <button class="toggle-btn" data-norm="rowNorm" role="radio" aria-checked="false">Row Normalized</button>
+                    <button class="toggle-btn" data-norm="colNorm" role="radio" aria-checked="false">Col Normalized</button>
+                </div>
+                <div class="toggle-group" role="radiogroup" aria-label="Source filter">
+                    <span class="toggle-group-label">Source</span>
+                    <button class="toggle-btn active" data-source="combined" role="radio" aria-checked="true">Combined</button>
+                    <button class="toggle-btn" data-source="statements" role="radio" aria-checked="false">Statements</button>
+                    <button class="toggle-btn" data-source="papers" role="radio" aria-checked="false">Papers</button>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h3 id="heatmap-title">Region &times; Theme Heatmap</h3>
+                <div class="chart-container chart-heatmap" id="chart-heatmap"></div>
+            </div>
+            <div id="annotations-heatmap-main" class="annotations-container"></div>
+
+            <div class="chart-grid-2">
+                <div class="chart-card">
+                    <h3>Row Marginals (by Region)</h3>
+                    <div class="chart-container chart-sm" id="chart-row-marginal"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Column Marginals (by Theme)</h3>
+                    <div class="chart-container chart-sm" id="chart-col-marginal"></div>
+                </div>
+            </div>
+            <div id="annotations-heatmap-gaps" class="annotations-container"></div>
+        </section>
+
+        <!-- Tab 3: Geographic Distribution -->
+        <section id="pane-geographic" class="tab-pane" role="tabpanel" aria-labelledby="tab-geographic">
+            <h2 class="section-title">Geographic Distribution</h2>
+
+            <div class="chart-card">
+                <h3>Countries by Volume</h3>
+                <div class="chart-container chart-tall" id="chart-country-treemap"></div>
+            </div>
+
+            <div class="chart-grid-2">
+                <div class="chart-card">
+                    <h3>Region Totals</h3>
+                    <div class="chart-container" id="chart-region-totals"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Statements vs Papers by Region</h3>
+                    <div class="chart-container" id="chart-region-source"></div>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h3>Source Language Distribution</h3>
+                <div class="chart-container chart-sm" id="chart-language"></div>
+            </div>
+            <div id="annotations-geographic-concentration" class="annotations-container"></div>
+            <div id="annotations-geographic-language" class="annotations-container"></div>
+        </section>
+
+        <!-- Tab 4: Temporal Trends -->
+        <section id="pane-temporal" class="tab-pane" role="tabpanel" aria-labelledby="tab-temporal">
+            <h2 class="section-title">Temporal Trends</h2>
+
+            <div class="chart-card">
+                <h3>Theme Emergence Over Time</h3>
+                <div class="chart-container chart-tall" id="chart-theme-timeline"></div>
+            </div>
+
+            <div class="chart-grid-2">
+                <div class="chart-card">
+                    <h3>Statements vs Papers Over Time</h3>
+                    <div class="chart-container" id="chart-source-timeline"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Cumulative Growth</h3>
+                    <div class="chart-container" id="chart-cumulative"></div>
+                </div>
+            </div>
+            <div id="annotations-temporal-emergence" class="annotations-container"></div>
+            <div id="annotations-temporal-cumulative" class="annotations-container"></div>
+        </section>
+
+        <!-- Tab 5: Voice Gap Analysis -->
+        <section id="pane-voicegap" class="tab-pane" role="tabpanel" aria-labelledby="tab-voicegap">
+            <h2 class="section-title">Voice Gap Analysis</h2>
+            <p class="section-desc">Who is shaping the conversation on AI and labor? This tab reveals imbalances between those authoring policy and those most affected.</p>
+
+            <div class="chart-grid-2">
+                <div class="chart-card">
+                    <h3>Speaker Types</h3>
+                    <div class="chart-container" id="chart-org-types"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Binding Nature</h3>
+                    <div class="chart-container" id="chart-binding"></div>
+                </div>
+            </div>
+
+            <div id="annotations-voicegap-orgtypes" class="annotations-container"></div>
+
+            <div class="chart-grid-2">
+                <div class="chart-card">
+                    <h3>CST Citation Tracker</h3>
+                    <div class="chart-container" id="chart-cst"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>CST Engagement by Region</h3>
+                    <div class="chart-container" id="chart-cst-region"></div>
+                </div>
+            </div>
+            <div id="annotations-voicegap-cst" class="annotations-container"></div>
+
+            <div class="chart-card">
+                <h3>Authored vs Affected by Region</h3>
+                <div class="chart-container chart-tall" id="chart-voice-gap"></div>
+            </div>
+            <div id="annotations-voicegap-authored" class="annotations-container"></div>
+        </section>
+
+    </main>
+
+    <!-- Methodology & Limitations Disclosure -->
+    <details class="methodology-disclosure" style="max-width:1200px; margin:2rem auto; padding:0 1rem;">
+        <summary style="cursor:pointer; color:var(--text-secondary); font-size:0.85rem; padding:0.75rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card);">
+            Methodology &amp; Limitations
+        </summary>
+        <div style="padding:1rem; border:1px solid var(--border); border-top:none; border-radius:0 0 var(--radius) var(--radius); background:var(--bg-card); color:var(--text-secondary); font-size:0.8rem; line-height:1.6;" id="methodology-panel">
+            <p><strong>Classification Pipeline:</strong> All 17 labor themes are classified using English-language keyword regex patterns applied to title + full extract body (up to 10,000 characters). Non-English documents are systematically disadvantaged, contributing to higher cross-cutting rates in regions with lower English proficiency.</p>
+            <p><strong>Language Bias:</strong> The theme classifier uses English keyword patterns exclusively. Statements in non-English primary languages are almost certainly under-classified on all themes, not just surveillance. This is an epistemological limitation: concepts like &ldquo;gig work&rdquo; and &ldquo;just transition&rdquo; carry different meanings across linguistic traditions.</p>
+            <p><strong>Text Extraction:</strong> Document extracts are capped at 10,000 characters (<code>EXTRACT_CAP</code>), creating position-dependent classification bias for longer documents. If surveillance context appears beyond 10,000 characters, it will not be detected.</p>
+            <p><strong>Region Assignment:</strong> Items without geographic metadata are assigned to &ldquo;Global/International&rdquo; by default via <code>normalize_region()</code>, inflating that category.</p>
+            <p><strong>Surveillance Theme (v13 update):</strong> The surveillance theme uses a two-pass keyword gate with co-occurrence requirements. Three items (STMT-0496, STMT-1551, STMT-2040) are excluded by hard-coded rules. The v12 dashboard reported <abbr title="Heuristic-precision: the fraction of heuristic-flagged items that are genuinely about labor surveillance">heuristic-precision</abbr> of 51.3% based on a 1,500-character scan window. This was a <strong>methodological artifact</strong>: the window-cap fix (identified post-hoc after inspecting false positives) widened the scan to the full 10,000-character extract body, correcting heuristic-precision to 87.2% (n=117 census, no CI). The 87.2% figure is a corrected-pipeline estimate, not a replication. 15 residual candidate false positives remain for human adjudication. The surveillance theme is composite, encompassing algorithmic management, biometric monitoring, bossware, and workplace monitoring.</p>
+            <p><strong>Religious Ethics Tracker:</strong> Originally developed to measure Catholic Social Teaching (CST) citations. Expanded in v12 to include Islamic, Protestant/Ecumenical, Buddhist, Jewish, and Gandhian/Indian ethical economics sources. Detection rates reflect both corpus composition and keyword specificity; absence of matches does not indicate absence of discourse in a tradition.</p>
+            <p><strong>Collection Bias:</strong> The Tapestry database conducted 12+ targeted ingestion waves that systematically prioritized 2023&ndash;2026 documents. Temporal concentration figures reflect collection strategy alongside genuine discourse growth.</p>
+            <p><strong>Heuristic vs. Human Judgment:</strong> All precision figures in this dashboard are <em>heuristic-precision</em> &mdash; the fraction of keyword-flagged items judged relevant by the heuristic rules themselves. Only manual domain-expert review can establish true classification precision. Heuristic-precision is a lower bound on true precision only if the heuristic&rsquo;s errors are biased toward false negatives.</p>
+        </div>
+    </details>
+
+    <!-- Methodology Diff Panel (AC11) -->
+    <details class="methodology-disclosure" style="max-width:1200px; margin:2rem auto; padding:0 1rem;">
+        <summary style="cursor:pointer; color:var(--text-secondary); font-size:0.85rem; padding:0.75rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card);">
+            What Changed: v12 &#8594; v13
+        </summary>
+        <div style="padding:1rem; border:1px solid var(--border); border-top:none; border-radius:0 0 var(--radius) var(--radius); background:var(--bg-card); color:var(--text-secondary); font-size:0.8rem; line-height:1.6;">
+            <table style="width:100%; border-collapse:collapse; margin:0.5rem 0;">
+                <thead>
+                    <tr style="border-bottom:2px solid var(--border);">
+                        <th style="text-align:left; padding:0.4rem; color:var(--text-primary);">Aspect</th>
+                        <th style="text-align:left; padding:0.4rem; color:var(--text-primary);">v12 (2026-04-12)</th>
+                        <th style="text-align:left; padding:0.4rem; color:var(--text-primary);">v13 (2026-04-13)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:0.4rem;">Surveillance scan window</td>
+                        <td style="padding:0.4rem;">1,500 characters</td>
+                        <td style="padding:0.4rem;"><strong>10,000 characters</strong> (full EXTRACT_CAP)</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:0.4rem;">Surveillance heuristic-precision</td>
+                        <td style="padding:0.4rem;">51.3% (117-item census)</td>
+                        <td style="padding:0.4rem;"><strong>87.2%</strong> (117-item census, 42 FP&#8594;TP flips)</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:0.4rem;">Corpus size</td>
+                        <td style="padding:0.4rem;" colspan="2">Unchanged (~3,253 statements + ~2,368 papers)</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:0.4rem;">Keyword patterns</td>
+                        <td style="padding:0.4rem;" colspan="2">Unchanged (17 theme patterns)</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:0.4rem;">Classification rules</td>
+                        <td style="padding:0.4rem;" colspan="2">Unchanged (two-pass gate, co-occurrence, exclusion list)</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:0.4rem;">Non-surveillance themes</td>
+                        <td style="padding:0.4rem;" colspan="2">Unchanged</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:0.4rem;">Narrative annotations</td>
+                        <td style="padding:0.4rem;">S15 framing</td>
+                        <td style="padding:0.4rem;"><strong>S16 corrected</strong> (post-hoc exploratory reanalysis)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </details>
+
+    <!-- Provenance Footer -->
+    <footer style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.75rem; border-top:1px solid var(--border); line-height:1.8;">
+        CEI Literature Vault &mdash; AI &amp; Labor Dashboard v13<br>
+        Data: Tapestry (3,253 statements) + CEI-Lit-WS (2,368 papers) &mdash; keyword classification with 17 labor themes<br>
+        v13 (2026-04-13): S16 surveillance rescore integrated. Prior version: <a href="https://cjimmylin.github.io/cei-labor-dashboard/" style="color:var(--accent-light);">v12 (frozen snapshot)</a><br>
+        Generated <span id="footer-timestamp"></span> &mdash; Centre for Ethics and Integrity
+    </footer>
+
+    <!-- ECharts 5.5.0 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" integrity="sha384-o5uz97et3bErHvpKfD4Jz4n0JfhJDWABFuF4NP+iEEDxE1VwMWJ19QGR0lqFZnr6" crossorigin="anonymous"></script>
+
+    <!-- Data (pre-computed by Python generator) -->
+    <script src="data.js"></script>
+
+    <!-- Dashboard Logic -->
+    <script>
+    (function () {
+        'use strict';
+
+        /* ====================================================================
+           0. DATA GUARD
+           ==================================================================== */
+        if (typeof LABOR === 'undefined') {
+            var msg = document.createElement('div');
+            msg.className = 'narrative-box';
+            msg.style.marginTop = '2rem';
+            var strong = document.createElement('strong');
+            strong.textContent = 'Data not loaded.';
+            msg.appendChild(strong);
+            msg.appendChild(document.createTextNode(' Ensure data.js defines a global LABOR constant and is served from the same directory.'));
+            var mainEl = document.querySelector('.main-content');
+            mainEl.textContent = '';
+            mainEl.appendChild(msg);
+            return;
+        }
+
+        /* ====================================================================
+           0b. DATA ADAPTER — normalize data.js keys to chart expectations
+           ==================================================================== */
+        function labelsValuesToArray(obj) {
+            if (!obj || !obj.labels) return [];
+            return obj.labels.map(function (l, i) {
+                return { name: l, value: (obj.values || [])[i] || 0 };
+            });
+        }
+
+        // Geographic
+        var geo = LABOR.geographic || {};
+        if (!geo.countries && geo.countryTotals) geo.countries = geo.countryTotals;
+        if (geo.regionTotals && geo.regionTotals.labels) geo.regionTotals = labelsValuesToArray(geo.regionTotals);
+        if (!geo.regionSource && geo.regionBySource) geo.regionSource = geo.regionBySource;
+        if (!geo.languages && geo.languageDistribution) {
+            if (geo.languageDistribution.labels) {
+                geo.languages = labelsValuesToArray(geo.languageDistribution);
+            } else {
+                geo.languages = geo.languageDistribution;
+            }
+        }
+
+        // Temporal
+        var tmp = LABOR.temporal || {};
+        if (!tmp.themeTimeline && tmp.byTheme) {
+            var themeLabels = (LABOR.heatmap || {}).themes || [];
+            var themeKeys = (LABOR.heatmap || {}).themeKeys || Object.keys(tmp.byTheme);
+            tmp.themeTimeline = {
+                years: tmp.years || [],
+                themes: themeKeys.map(function (k, i) {
+                    return { name: themeLabels[i] || k, data: tmp.byTheme[k] || [] };
+                })
+            };
+        }
+        if (!tmp.sourceTimeline && tmp.bySource) {
+            tmp.sourceTimeline = {
+                years: tmp.years || [],
+                statements: tmp.bySource.statements || [],
+                papers: tmp.bySource.papers || []
+            };
+        }
+        if (tmp.cumulative && !tmp.cumulative.years) {
+            // cumulative is a flat array — wrap it
+            var cumYears = tmp.years || [];
+            var cumTotal = tmp.cumulative;
+            tmp.cumulative = { years: cumYears, total: cumTotal, statements: [], papers: [] };
+        }
+
+        // VoiceGap
+        var vg = LABOR.voiceGap || {};
+        if (vg.orgTypes && vg.orgTypes.labels) vg.orgTypes = labelsValuesToArray(vg.orgTypes);
+        if (vg.bindingNature && vg.bindingNature.labels) {
+            vg.binding = labelsValuesToArray(vg.bindingNature);
+        }
+        if (!vg.binding && vg.bindingNature) vg.binding = vg.bindingNature;
+        if (vg.cstCitations && vg.cstCitations.labels) vg.cstCitations = labelsValuesToArray(vg.cstCitations);
+        if (!vg.authoredVsAffected && vg.affectedVsAuthored) vg.authoredVsAffected = vg.affectedVsAuthored;
+
+        /* ====================================================================
+           1. THEME MANAGEMENT
+           ==================================================================== */
+        var themeToggle = document.getElementById('theme-toggle');
+        var themeIcon = themeToggle.querySelector('.theme-icon');
+
+        function applyTheme(theme) {
+            if (theme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+                themeIcon.textContent = '\u2600'; // sun
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                themeIcon.textContent = '\u263E'; // moon
+            }
+        }
+
+        // Load persisted preference (do NOT default to light)
+        var savedTheme = localStorage.getItem('labor-dash-theme');
+        if (savedTheme) {
+            applyTheme(savedTheme);
+        }
+
+        themeToggle.addEventListener('click', function () {
+            var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+            var next = isLight ? 'dark' : 'light';
+            applyTheme(next);
+            localStorage.setItem('labor-dash-theme', next);
+            // Re-render all visible charts with updated colors
+            renderActiveTab();
+        });
+
+        /* ====================================================================
+           2. TAB SWITCHING
+           ==================================================================== */
+        var tabBtns = document.querySelectorAll('.tab-btn');
+        var tabPanes = document.querySelectorAll('.tab-pane');
+
+        function activateTab(tabId) {
+            tabBtns.forEach(function (btn) {
+                var isTarget = btn.getAttribute('data-tab') === tabId;
+                btn.classList.toggle('active', isTarget);
+                btn.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+            });
+            tabPanes.forEach(function (pane) {
+                pane.classList.toggle('active', pane.id === 'pane-' + tabId);
+            });
+            // Resize charts in the newly-visible pane
+            resizeVisibleCharts();
+            renderActiveTab();
+        }
+
+        tabBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var tabId = btn.getAttribute('data-tab');
+                activateTab(tabId);
+                history.replaceState(null, '', '#' + tabId);
+            });
+        });
+
+        // Hash routing
+        function getTabFromHash() {
+            var hash = location.hash.replace('#', '');
+            var valid = ['summary', 'heatmap', 'geographic', 'temporal', 'voicegap'];
+            return valid.indexOf(hash) !== -1 ? hash : 'summary';
+        }
+
+        window.addEventListener('hashchange', function () {
+            activateTab(getTabFromHash());
+        });
+
+        /* ====================================================================
+           3. CHART REGISTRY & RESIZE
+           ==================================================================== */
+        var charts = {};
+
+        function getOrCreateChart(id) {
+            var el = document.getElementById(id);
+            if (!el) return null;
+            if (charts[id]) {
+                return charts[id];
+            }
+            var instance = echarts.init(el);
+            charts[id] = instance;
+            return instance;
+        }
+
+        function resizeVisibleCharts() {
+            Object.keys(charts).forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el && el.offsetParent !== null) {
+                    charts[id].resize();
+                }
+            });
+        }
+
+        window.addEventListener('resize', function () {
+            resizeVisibleCharts();
+        });
+
+        /* ====================================================================
+           4. THEME-AWARE COLORS
+           ==================================================================== */
+        // Okabe-Ito inspired colorblind-safe palette (17 colors for 17 themes)
+        var OI_PALETTE = [
+            '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#06b6d4',
+            '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16',
+            '#a855f7', '#22d3ee', '#fb923c', '#34d399', '#e879f9',
+            '#0ea5e9', '#d946ef'
+        ];
+
+        function isDark() {
+            return document.documentElement.getAttribute('data-theme') !== 'light';
+        }
+
+        function getThemeColors() {
+            var dark = isDark();
+            return {
+                bg: dark ? '#0f172a' : '#ffffff',
+                cardBg: dark ? '#1e293b' : '#ffffff',
+                text: dark ? '#f1f5f9' : '#1e293b',
+                textSecondary: dark ? '#94a3b8' : '#475569',
+                textMuted: dark ? '#64748b' : '#94a3b8',
+                border: dark ? '#334155' : '#e2e8f0',
+                accent: dark ? '#818cf8' : '#4f46e5',
+                splitLine: dark ? '#1e293b' : '#f1f5f9',
+                palette: OI_PALETTE
+            };
+        }
+
+        function baseAxisStyle(tc) {
+            return {
+                axisLabel: { color: tc.textSecondary, fontSize: 11 },
+                axisLine: { lineStyle: { color: tc.border } },
+                splitLine: { lineStyle: { color: tc.splitLine } },
+                nameTextStyle: { color: tc.textMuted, fontSize: 11 }
+            };
+        }
+
+        function baseToolbox(tc) {
+            return {
+                show: true,
+                right: 10,
+                top: 0,
+                iconStyle: { borderColor: tc.textMuted },
+                emphasis: { iconStyle: { borderColor: tc.accent } },
+                feature: {
+                    saveAsImage: { title: 'Save PNG', pixelRatio: 2 },
+                    dataView: { title: 'Data', readOnly: true, lang: ['Data View', 'Close', ''] },
+                    restore: { title: 'Reset' }
+                }
+            };
+        }
+
+        /* ====================================================================
+           5. KPI POPULATION
+           ==================================================================== */
+        function populateKPIs() {
+            var s = LABOR.summary || {};
+            setKPI('kpi-total', s.totalDocuments);
+            setKPI('kpi-statements', s.totalStatements);
+            setKPI('kpi-papers', s.totalPapers);
+            setKPI('kpi-countries', s.totalCountries);
+            setKPI('kpi-themes', s.totalThemes);
+            setKPI('kpi-daterange', s.dateRange);
+
+            if (s.totalStatements && s.totalPapers) {
+                document.getElementById('kpi-total-detail').textContent =
+                    s.totalStatements + ' statements + ' + s.totalPapers + ' papers';
+            }
+            if (s.totalRegions) {
+                document.getElementById('kpi-countries-detail').textContent =
+                    s.totalRegions + ' regions';
+            }
+            if (s.dateRangeDetail) {
+                document.getElementById('kpi-daterange-detail').textContent = s.dateRangeDetail;
+            }
+        }
+
+        function setKPI(id, val) {
+            var el = document.getElementById(id);
+            if (el && val !== undefined && val !== null) {
+                el.textContent = typeof val === 'number' ? val.toLocaleString() : val;
+            }
+        }
+
+        /* ====================================================================
+           6. FINDING CARDS (safe DOM construction)
+           ==================================================================== */
+        function renderFindings() {
+            var grid = document.getElementById('findings-grid');
+            var findings = (LABOR.summary || {}).keyFindings || [];
+            if (!findings.length) {
+                grid.style.display = 'none';
+                return;
+            }
+            // Clear existing content
+            while (grid.firstChild) {
+                grid.removeChild(grid.firstChild);
+            }
+            findings.forEach(function (text, i) {
+                var card = document.createElement('div');
+                card.className = 'finding-card';
+
+                var numEl = document.createElement('div');
+                numEl.className = 'finding-num';
+                numEl.textContent = String(i + 1);
+
+                var bodyEl = document.createElement('div');
+                bodyEl.className = 'finding-body';
+                bodyEl.textContent = text;
+
+                card.appendChild(numEl);
+                card.appendChild(bodyEl);
+                grid.appendChild(card);
+            });
+        }
+
+        /* ====================================================================
+           7. CHART RENDERERS
+           ==================================================================== */
+
+        /* --- Tab 1: Top Themes Bar --- */
+        function renderThemesBar() {
+            var tc = getThemeColors();
+            var topThemes = (LABOR.summary || {}).topThemes;
+            if (!topThemes) return;
+
+            var labels = topThemes.labels.slice().reverse();
+            var values = topThemes.values.slice().reverse();
+
+            var chart = getOrCreateChart('chart-themes-bar');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                grid: { left: '30%', right: '8%', top: '4%', bottom: '8%' },
+                xAxis: Object.assign({ type: 'value' }, baseAxisStyle(tc)),
+                yAxis: Object.assign({ type: 'category', data: labels }, baseAxisStyle(tc)),
+                series: [{
+                    type: 'bar',
+                    data: values,
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                            { offset: 0, color: tc.palette[0] },
+                            { offset: 1, color: tc.palette[4] }
+                        ]),
+                        borderRadius: [0, 3, 3, 0]
+                    },
+                    barMaxWidth: 24,
+                    label: {
+                        show: true,
+                        position: 'right',
+                        color: tc.textSecondary,
+                        fontSize: 11
+                    }
+                }]
+            }, true);
+        }
+
+        /* --- Tab 1: Source Pie --- */
+        function renderSourcePie() {
+            var tc = getThemeColors();
+            var sb = (LABOR.summary || {}).sourceBreakdown;
+            if (!sb) return;
+
+            var chart = getOrCreateChart('chart-source-pie');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+                legend: {
+                    bottom: 10,
+                    textStyle: { color: tc.textSecondary, fontSize: 11 }
+                },
+                color: tc.palette,
+                series: [{
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    avoidLabelOverlap: true,
+                    itemStyle: { borderRadius: 6, borderColor: tc.cardBg, borderWidth: 2 },
+                    label: { color: tc.textSecondary, fontSize: 11 },
+                    data: sb
+                }]
+            }, true);
+        }
+
+        /* --- Tab 2: Heatmap --- */
+        var heatmapState = { norm: 'raw', source: 'combined' };
+
+        function getHeatmapData() {
+            var hm = LABOR.heatmap || {};
+            var norm = heatmapState.norm;
+            var src = heatmapState.source;
+
+            var matrix;
+            if (norm === 'raw') {
+                matrix = (src === 'combined') ? hm.matrix :
+                         (src === 'statements') ? hm.matrixStatements :
+                         hm.matrixPapers;
+            } else if (norm === 'rowNorm') {
+                matrix = (src === 'combined') ? hm.matrixRowNorm :
+                         (src === 'statements') ? hm.matrixStatementsRowNorm :
+                         hm.matrixPapersRowNorm;
+            } else {
+                matrix = (src === 'combined') ? hm.matrixColNorm :
+                         (src === 'statements') ? hm.matrixStatementsColNorm :
+                         hm.matrixPapersColNorm;
+            }
+
+            // Fallback: if specific source/norm combo not available, use combined raw
+            if (!matrix) {
+                matrix = hm.matrix || [];
+            }
+
+            // Build [colIdx, rowIdx, value] array
+            var data = [];
+            var maxVal = 0;
+            for (var r = 0; r < matrix.length; r++) {
+                for (var c = 0; c < (matrix[r] || []).length; c++) {
+                    var v = matrix[r][c] || 0;
+                    data.push([c, r, v]);
+                    if (v > maxVal) maxVal = v;
+                }
+            }
+            return { data: data, maxVal: maxVal };
+        }
+
+        function renderHeatmap() {
+            var tc = getThemeColors();
+            var hm = LABOR.heatmap || {};
+            var regions = hm.regions || [];
+            var themes = hm.themes || [];
+            var result = getHeatmapData();
+
+            var chart = getOrCreateChart('chart-heatmap');
+            if (!chart) return;
+
+            var isNormalized = heatmapState.norm !== 'raw';
+            var formatVal = isNormalized ? function (v) { return (v * 100).toFixed(1) + '%'; }
+                                         : function (v) { return v; };
+
+            // Update title
+            var titleEl = document.getElementById('heatmap-title');
+            var normLabel = heatmapState.norm === 'raw' ? 'Raw Counts' :
+                            heatmapState.norm === 'rowNorm' ? 'Row Normalized' : 'Column Normalized';
+            var srcLabel = heatmapState.source.charAt(0).toUpperCase() + heatmapState.source.slice(1);
+            if (titleEl) {
+                titleEl.textContent = 'Region \u00D7 Theme Heatmap \u2014 ' + normLabel + ' (' + srcLabel + ')';
+            }
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: {
+                    position: 'top',
+                    formatter: function (p) {
+                        var themeName = themes[p.data[0]] || '';
+                        var regionName = regions[p.data[1]] || '';
+                        return '<strong>' + themeName + '</strong><br>' +
+                               regionName + ': ' + formatVal(p.data[2]);
+                    }
+                },
+                grid: {
+                    left: '16%', right: '12%', top: '6%', bottom: '22%'
+                },
+                xAxis: {
+                    type: 'category',
+                    data: themes,
+                    axisLabel: { color: tc.textSecondary, fontSize: 10, rotate: 40, interval: 0 },
+                    axisLine: { lineStyle: { color: tc.border } },
+                    splitArea: { show: true, areaStyle: { color: ['transparent', 'rgba(99,102,241,0.02)'] } }
+                },
+                yAxis: {
+                    type: 'category',
+                    data: regions,
+                    axisLabel: { color: tc.textSecondary, fontSize: 11, interval: 0 },
+                    axisLine: { lineStyle: { color: tc.border } }
+                },
+                visualMap: {
+                    min: 0,
+                    max: result.maxVal || 1,
+                    calculable: true,
+                    orient: 'horizontal',
+                    left: 'center',
+                    bottom: 0,
+                    textStyle: { color: tc.textSecondary, fontSize: 10 },
+                    inRange: {
+                        color: ['#0d1b2a', '#1b2838', '#2a4858', '#3b6978', '#52ab98', '#c8d96f', '#f0e68c']
+                    },
+                    formatter: isNormalized ? function (v) { return (v * 100).toFixed(0) + '%'; } : undefined
+                },
+                series: [{
+                    type: 'heatmap',
+                    data: result.data,
+                    label: {
+                        show: result.data.length < 250,
+                        color: tc.text,
+                        fontSize: 10,
+                        formatter: function (p) { return isNormalized ? (p.data[2] * 100).toFixed(0) : p.data[2]; }
+                    },
+                    emphasis: {
+                        itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.5)' }
+                    }
+                }]
+            }, true);
+        }
+
+        /* --- Tab 2: Row Marginals --- */
+        function renderRowMarginal() {
+            var tc = getThemeColors();
+            var hm = LABOR.heatmap || {};
+            var regions = hm.regions || [];
+            var rowTotals = hm.rowTotals || [];
+
+            var chart = getOrCreateChart('chart-row-marginal');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                grid: { left: '28%', right: '8%', top: '4%', bottom: '8%' },
+                xAxis: Object.assign({ type: 'value' }, baseAxisStyle(tc)),
+                yAxis: Object.assign({ type: 'category', data: regions }, baseAxisStyle(tc)),
+                series: [{
+                    type: 'bar',
+                    data: rowTotals,
+                    itemStyle: { color: tc.palette[0], borderRadius: [0, 3, 3, 0] },
+                    barMaxWidth: 20
+                }]
+            }, true);
+        }
+
+        /* --- Tab 2: Col Marginals --- */
+        function renderColMarginal() {
+            var tc = getThemeColors();
+            var hm = LABOR.heatmap || {};
+            var themes = hm.themes || [];
+            var colTotals = hm.colTotals || [];
+
+            var chart = getOrCreateChart('chart-col-marginal');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                grid: { left: '8%', right: '4%', top: '4%', bottom: '28%' },
+                xAxis: Object.assign({
+                    type: 'category', data: themes,
+                    axisLabel: { rotate: 40, interval: 0, fontSize: 10, color: tc.textSecondary }
+                }, baseAxisStyle(tc)),
+                yAxis: Object.assign({ type: 'value' }, baseAxisStyle(tc)),
+                series: [{
+                    type: 'bar',
+                    data: colTotals,
+                    itemStyle: { color: tc.palette[1], borderRadius: [3, 3, 0, 0] },
+                    barMaxWidth: 24
+                }]
+            }, true);
+        }
+
+        /* --- Tab 3: Country Treemap --- */
+        function renderCountryTreemap() {
+            var tc = getThemeColors();
+            var geo = LABOR.geographic || {};
+            var countries = geo.countries || [];
+
+            var chart = getOrCreateChart('chart-country-treemap');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { formatter: '{b}: {c}' },
+                series: [{
+                    type: 'treemap',
+                    data: countries.map(function (c, i) {
+                        return { name: c.name, value: c.value, itemStyle: { color: tc.palette[i % tc.palette.length] } };
+                    }),
+                    label: { color: '#fff', fontSize: 12, fontWeight: 500 },
+                    breadcrumb: { show: false },
+                    roam: false,
+                    nodeClick: false,
+                    levels: [{
+                        itemStyle: { borderColor: tc.cardBg, borderWidth: 2, gapWidth: 2 }
+                    }]
+                }]
+            }, true);
+        }
+
+        /* --- Tab 3: Region Totals --- */
+        function renderRegionTotals() {
+            var tc = getThemeColors();
+            var geo = LABOR.geographic || {};
+            var data = geo.regionTotals || [];
+
+            var chart = getOrCreateChart('chart-region-totals');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+                color: tc.palette,
+                legend: { show: false },
+                series: [{
+                    type: 'pie',
+                    radius: ['35%', '65%'],
+                    itemStyle: { borderRadius: 4, borderColor: tc.cardBg, borderWidth: 2 },
+                    label: { color: tc.textSecondary, fontSize: 11, formatter: '{b}\n{d}%' },
+                    data: data
+                }]
+            }, true);
+        }
+
+        /* --- Tab 3: Region Source (Grouped Bar) --- */
+        function renderRegionSource() {
+            var tc = getThemeColors();
+            var geo = LABOR.geographic || {};
+            var rs = geo.regionSource || {};
+            var regions = rs.regions || [];
+
+            var chart = getOrCreateChart('chart-region-source');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                legend: {
+                    data: ['Statements', 'Papers'],
+                    textStyle: { color: tc.textSecondary, fontSize: 11 },
+                    top: 5
+                },
+                grid: { left: '24%', right: '4%', top: '14%', bottom: '8%' },
+                xAxis: Object.assign({ type: 'value' }, baseAxisStyle(tc)),
+                yAxis: Object.assign({ type: 'category', data: regions }, baseAxisStyle(tc)),
+                series: [
+                    {
+                        name: 'Statements', type: 'bar',
+                        data: rs.statements || [],
+                        itemStyle: { color: tc.palette[0], borderRadius: [0, 3, 3, 0] },
+                        barMaxWidth: 16
+                    },
+                    {
+                        name: 'Papers', type: 'bar',
+                        data: rs.papers || [],
+                        itemStyle: { color: tc.palette[1], borderRadius: [0, 3, 3, 0] },
+                        barMaxWidth: 16
+                    }
+                ]
+            }, true);
+        }
+
+        /* --- Tab 3: Language --- */
+        function renderLanguage() {
+            var tc = getThemeColors();
+            var geo = LABOR.geographic || {};
+            var lang = geo.languages || [];
+
+            var chart = getOrCreateChart('chart-language');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                grid: { left: '18%', right: '8%', top: '4%', bottom: '8%' },
+                xAxis: Object.assign({ type: 'value' }, baseAxisStyle(tc)),
+                yAxis: Object.assign({
+                    type: 'category',
+                    data: lang.map(function (l) { return l.name; })
+                }, baseAxisStyle(tc)),
+                series: [{
+                    type: 'bar',
+                    data: lang.map(function (l) { return l.value; }),
+                    itemStyle: { color: tc.palette[5], borderRadius: [0, 3, 3, 0] },
+                    barMaxWidth: 20,
+                    label: { show: true, position: 'right', color: tc.textSecondary, fontSize: 10 }
+                }]
+            }, true);
+        }
+
+        /* --- Tab 4: Theme Timeline (Stacked Area + Event Markers) --- */
+        function renderThemeTimeline() {
+            var tc = getThemeColors();
+            var tmp = LABOR.temporal || {};
+            var timeline = tmp.themeTimeline || {};
+            var years = timeline.years || [];
+            var themes = timeline.themes || [];
+
+            var chart = getOrCreateChart('chart-theme-timeline');
+            if (!chart) return;
+
+            var series = themes.map(function (t, i) {
+                return {
+                    name: t.name,
+                    type: 'line',
+                    stack: 'themes',
+                    areaStyle: { opacity: 0.5 },
+                    emphasis: { focus: 'series' },
+                    data: t.data,
+                    lineStyle: { width: 1 },
+                    itemStyle: { color: tc.palette[i % tc.palette.length] },
+                    symbol: 'none'
+                };
+            });
+
+            // Event markers
+            var events = tmp.events || [];
+            if (events.length > 0) {
+                series.push({
+                    type: 'line',
+                    data: [],
+                    markLine: {
+                        silent: true,
+                        symbol: 'none',
+                        lineStyle: { type: 'dashed', color: '#ef4444', width: 1 },
+                        label: { fontSize: 10, color: tc.textMuted, rotate: 45, position: 'start' },
+                        data: events.map(function (e) {
+                            return {
+                                xAxis: e.year + (e.month ? (e.month - 1) / 12 : 0),
+                                label: { formatter: e.label }
+                            };
+                        })
+                    }
+                });
+            }
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis' },
+                legend: {
+                    type: 'scroll',
+                    bottom: 0,
+                    textStyle: { color: tc.textSecondary, fontSize: 10 }
+                },
+                grid: { left: '6%', right: '4%', top: '6%', bottom: '18%' },
+                xAxis: Object.assign({ type: 'category', data: years, boundaryGap: false }, baseAxisStyle(tc)),
+                yAxis: Object.assign({ type: 'value', name: 'Documents' }, baseAxisStyle(tc)),
+                series: series
+            }, true);
+        }
+
+        /* --- Tab 4: Source Timeline --- */
+        function renderSourceTimeline() {
+            var tc = getThemeColors();
+            var tmp = LABOR.temporal || {};
+            var st = tmp.sourceTimeline || {};
+
+            var chart = getOrCreateChart('chart-source-timeline');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis' },
+                legend: {
+                    data: ['Statements', 'Papers'],
+                    textStyle: { color: tc.textSecondary, fontSize: 11 },
+                    top: 5
+                },
+                grid: { left: '8%', right: '4%', top: '14%', bottom: '8%' },
+                xAxis: Object.assign({ type: 'category', data: st.years || [] }, baseAxisStyle(tc)),
+                yAxis: Object.assign({ type: 'value' }, baseAxisStyle(tc)),
+                series: [
+                    {
+                        name: 'Statements', type: 'bar',
+                        data: st.statements || [],
+                        itemStyle: { color: tc.palette[0], borderRadius: [3, 3, 0, 0] }
+                    },
+                    {
+                        name: 'Papers', type: 'bar',
+                        data: st.papers || [],
+                        itemStyle: { color: tc.palette[1], borderRadius: [3, 3, 0, 0] }
+                    }
+                ]
+            }, true);
+        }
+
+        /* --- Tab 4: Cumulative Growth --- */
+        function renderCumulative() {
+            var tc = getThemeColors();
+            var tmp = LABOR.temporal || {};
+            var cg = tmp.cumulative || {};
+
+            var chart = getOrCreateChart('chart-cumulative');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis' },
+                legend: {
+                    data: ['Statements', 'Papers', 'Total'],
+                    textStyle: { color: tc.textSecondary, fontSize: 11 },
+                    top: 5
+                },
+                grid: { left: '8%', right: '4%', top: '14%', bottom: '8%' },
+                xAxis: Object.assign({ type: 'category', data: cg.years || [], boundaryGap: false }, baseAxisStyle(tc)),
+                yAxis: Object.assign({ type: 'value', name: 'Cumulative' }, baseAxisStyle(tc)),
+                series: [
+                    {
+                        name: 'Total', type: 'line',
+                        data: cg.total || [],
+                        lineStyle: { width: 2.5, color: tc.palette[3] },
+                        itemStyle: { color: tc.palette[3] },
+                        symbol: 'none',
+                        areaStyle: { opacity: 0.08, color: tc.palette[3] }
+                    },
+                    {
+                        name: 'Statements', type: 'line',
+                        data: cg.statements || [],
+                        lineStyle: { width: 1.5, type: 'dashed', color: tc.palette[0] },
+                        itemStyle: { color: tc.palette[0] },
+                        symbol: 'none'
+                    },
+                    {
+                        name: 'Papers', type: 'line',
+                        data: cg.papers || [],
+                        lineStyle: { width: 1.5, type: 'dashed', color: tc.palette[1] },
+                        itemStyle: { color: tc.palette[1] },
+                        symbol: 'none'
+                    }
+                ]
+            }, true);
+        }
+
+        /* --- Tab 5: Org Types --- */
+        function renderOrgTypes() {
+            var tc = getThemeColors();
+            var vg = LABOR.voiceGap || {};
+            var orgTypes = vg.orgTypes || [];
+
+            var chart = getOrCreateChart('chart-org-types');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+                color: tc.palette,
+                legend: { bottom: 10, textStyle: { color: tc.textSecondary, fontSize: 10 } },
+                series: [{
+                    type: 'pie',
+                    radius: ['35%', '65%'],
+                    itemStyle: { borderRadius: 4, borderColor: tc.cardBg, borderWidth: 2 },
+                    label: { color: tc.textSecondary, fontSize: 11 },
+                    data: orgTypes
+                }]
+            }, true);
+        }
+
+        /* --- Tab 5: Binding Nature --- */
+        function renderBinding() {
+            var tc = getThemeColors();
+            var vg = LABOR.voiceGap || {};
+            var binding = vg.binding || [];
+
+            var chart = getOrCreateChart('chart-binding');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+                color: [tc.palette[2], tc.palette[4], tc.palette[6], tc.palette[8]],
+                legend: { bottom: 10, textStyle: { color: tc.textSecondary, fontSize: 10 } },
+                series: [{
+                    type: 'pie',
+                    radius: ['35%', '65%'],
+                    itemStyle: { borderRadius: 4, borderColor: tc.cardBg, borderWidth: 2 },
+                    label: { color: tc.textSecondary, fontSize: 11 },
+                    data: binding
+                }]
+            }, true);
+        }
+
+        /* --- Tab 5: CST Citations --- */
+        function renderCST() {
+            var tc = getThemeColors();
+            var vg = LABOR.voiceGap || {};
+            var cst = vg.cstCitations || [];
+
+            var chart = getOrCreateChart('chart-cst');
+            if (!chart) return;
+
+            var labels = cst.map(function (c) { return c.name; }).reverse();
+            var values = cst.map(function (c) { return c.value; }).reverse();
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                grid: { left: '40%', right: '8%', top: '4%', bottom: '8%' },
+                xAxis: Object.assign({ type: 'value' }, baseAxisStyle(tc)),
+                yAxis: Object.assign({ type: 'category', data: labels }, baseAxisStyle(tc)),
+                series: [{
+                    type: 'bar',
+                    data: values,
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                            { offset: 0, color: tc.palette[5] },
+                            { offset: 1, color: tc.palette[10] }
+                        ]),
+                        borderRadius: [0, 3, 3, 0]
+                    },
+                    barMaxWidth: 20,
+                    label: { show: true, position: 'right', color: tc.textSecondary, fontSize: 10 }
+                }]
+            }, true);
+        }
+
+        /* --- Tab 5: CST Engagement by Region --- */
+        function renderCSTByRegion() {
+            var tc = getThemeColors();
+            var vg = LABOR.voiceGap || {};
+            var cbr = vg.cstByRegion || {};
+            var regions = cbr.regions || [];
+            var rates = cbr.rates || [];
+            var counts = cbr.counts || [];
+
+            var chart = getOrCreateChart('chart-cst-region');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: function (params) {
+                        var p = params[0];
+                        var idx = p.dataIndex;
+                        return p.name + '<br>CST engagement: ' + rates[idx] + '% (' + counts[idx] + ' items)';
+                    }
+                },
+                grid: { left: '35%', right: '10%', top: '4%', bottom: '8%' },
+                xAxis: Object.assign({ type: 'value', name: '% citing CST', max: 10 }, baseAxisStyle(tc)),
+                yAxis: Object.assign({ type: 'category', data: regions.slice().reverse() }, baseAxisStyle(tc)),
+                series: [{
+                    type: 'bar',
+                    data: rates.slice().reverse(),
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                            { offset: 0, color: '#d97706' },
+                            { offset: 1, color: '#f59e0b' }
+                        ]),
+                        borderRadius: [0, 3, 3, 0]
+                    },
+                    barMaxWidth: 18,
+                    label: {
+                        show: true, position: 'right',
+                        color: tc.textSecondary, fontSize: 10,
+                        formatter: function (p) { return p.value > 0 ? p.value + '%' : ''; }
+                    }
+                }]
+            }, true);
+        }
+
+        /* --- Tab 5: Voice Gap (Grouped Horizontal Bar) --- */
+        function renderVoiceGap() {
+            var tc = getThemeColors();
+            var vg = LABOR.voiceGap || {};
+            var gap = vg.authoredVsAffected || {};
+            var regions = gap.regions || [];
+
+            var chart = getOrCreateChart('chart-voice-gap');
+            if (!chart) return;
+
+            chart.setOption({
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                legend: {
+                    data: ['Authored', 'Affected'],
+                    textStyle: { color: tc.textSecondary, fontSize: 11 },
+                    top: 5
+                },
+                grid: { left: '22%', right: '6%', top: '10%', bottom: '6%' },
+                xAxis: Object.assign({ type: 'value' }, baseAxisStyle(tc)),
+                yAxis: Object.assign({ type: 'category', data: regions }, baseAxisStyle(tc)),
+                series: [
+                    {
+                        name: 'Authored', type: 'bar',
+                        data: gap.authored || [],
+                        itemStyle: { color: tc.palette[0], borderRadius: [0, 3, 3, 0] },
+                        barMaxWidth: 14
+                    },
+                    {
+                        name: 'Affected', type: 'bar',
+                        data: gap.affected || [],
+                        itemStyle: { color: tc.palette[3], borderRadius: [0, 3, 3, 0] },
+                        barMaxWidth: 14
+                    }
+                ]
+            }, true);
+        }
+
+        /* ====================================================================
+           8. HEATMAP CONTROLS
+           ==================================================================== */
+        document.querySelectorAll('[data-norm]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('[data-norm]').forEach(function (b) {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-checked', 'false');
+                });
+                btn.classList.add('active');
+                btn.setAttribute('aria-checked', 'true');
+                heatmapState.norm = btn.getAttribute('data-norm');
+                renderHeatmap();
+            });
+        });
+
+        document.querySelectorAll('[data-source]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('[data-source]').forEach(function (b) {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-checked', 'false');
+                });
+                btn.classList.add('active');
+                btn.setAttribute('aria-checked', 'true');
+                heatmapState.source = btn.getAttribute('data-source');
+                renderHeatmap();
+            });
+        });
+
+        /* ====================================================================
+           8b. ANNOTATION SYSTEM
+           ==================================================================== */
+        var PERSPECTIVE_COLORS = {
+            'Labor Policy': '#6366f1',
+            'CST Perspective': '#d97706',
+            'Regional Studies': '#10b981',
+            'Computational Linguistics': '#8b5cf6',
+            'Data Visualization': '#06b6d4',
+            'Academic Writing': '#ec4899',
+            'Ecumenical Perspective': '#14b8a6',
+            'Methodology': '#ef4444'
+        };
+
+        function renderAnnotations(containerKey) {
+            var container = document.getElementById('annotations-' + containerKey.replace(/\./g, '-'));
+            if (!container) return;
+            var ann = (LABOR.annotations || {})[containerKey];
+            if (!ann || !ann.length) return;
+
+            while (container.firstChild) container.removeChild(container.firstChild);
+            ann.forEach(function (a) {
+                var card = document.createElement('div');
+                card.className = 'annotation-card';
+                var borderColor = PERSPECTIVE_COLORS[a.perspective] || '#6366f1';
+                card.style.borderLeftColor = borderColor;
+
+                var label = document.createElement('span');
+                label.className = 'annotation-perspective';
+                label.style.color = borderColor;
+                label.textContent = a.perspective;
+
+                var text = document.createElement('p');
+                text.className = 'annotation-text';
+                text.textContent = a.text;
+
+                card.appendChild(label);
+                card.appendChild(text);
+
+                if (a.detail) {
+                    var toggle = document.createElement('button');
+                    toggle.className = 'annotation-toggle';
+                    toggle.textContent = 'Read more';
+                    toggle.setAttribute('aria-expanded', 'false');
+                    var detail = document.createElement('p');
+                    detail.className = 'annotation-detail';
+                    detail.textContent = a.detail;
+                    detail.style.display = 'none';
+                    toggle.addEventListener('click', function () {
+                        var expanded = detail.style.display !== 'none';
+                        detail.style.display = expanded ? 'none' : 'block';
+                        toggle.textContent = expanded ? 'Read more' : 'Show less';
+                        toggle.setAttribute('aria-expanded', String(!expanded));
+                    });
+                    card.appendChild(toggle);
+                    card.appendChild(detail);
+                }
+
+                container.appendChild(card);
+            });
+        }
+
+        function renderAllAnnotations(tabId) {
+            var keyMap = {
+                summary: ['summary.findings', 'summary.themes', 'summary.acceleration'],
+                heatmap: ['heatmap.main', 'heatmap.gaps'],
+                geographic: ['geographic.concentration', 'geographic.language'],
+                temporal: ['temporal.emergence', 'temporal.cumulative'],
+                voicegap: ['voicegap.orgtypes', 'voicegap.cst', 'voicegap.authored']
+            };
+            var keys = keyMap[tabId] || [];
+            keys.forEach(renderAnnotations);
+        }
+
+        /* ====================================================================
+           9. RENDER ORCHESTRATION
+           ==================================================================== */
+        var tabRenderers = {
+            summary: function () {
+                renderFindings();
+                renderThemesBar();
+                renderSourcePie();
+                renderAllAnnotations('summary');
+            },
+            heatmap: function () {
+                renderHeatmap();
+                renderRowMarginal();
+                renderColMarginal();
+                renderAllAnnotations('heatmap');
+            },
+            geographic: function () {
+                renderCountryTreemap();
+                renderRegionTotals();
+                renderRegionSource();
+                renderLanguage();
+                renderAllAnnotations('geographic');
+            },
+            temporal: function () {
+                renderThemeTimeline();
+                renderSourceTimeline();
+                renderCumulative();
+                renderAllAnnotations('temporal');
+            },
+            voicegap: function () {
+                renderOrgTypes();
+                renderBinding();
+                renderCST();
+                renderCSTByRegion();
+                renderVoiceGap();
+                renderAllAnnotations('voicegap');
+            }
+        };
+
+        function getActiveTabId() {
+            var active = document.querySelector('.tab-btn.active');
+            return active ? active.getAttribute('data-tab') : 'summary';
+        }
+
+        function renderActiveTab() {
+            var tabId = getActiveTabId();
+            var renderer = tabRenderers[tabId];
+            if (renderer) {
+                renderer();
+            }
+            // Add toolbox to all charts rendered in this tab
+            var tc = getThemeColors();
+            var tb = baseToolbox(tc);
+            setTimeout(function () {
+                Object.keys(charts).forEach(function (id) {
+                    var el = document.getElementById(id);
+                    if (el && el.offsetParent !== null) {
+                        charts[id].setOption({ toolbox: tb }, false);
+                    }
+                });
+                resizeVisibleCharts();
+            }, 50);
+        }
+
+        /* ====================================================================
+           10. INIT
+           ==================================================================== */
+        populateKPIs();
+
+        // Footer timestamp
+        var tsEl = document.getElementById('footer-timestamp');
+        if (tsEl && LABOR.meta && LABOR.meta.generated) {
+            tsEl.textContent = LABOR.meta.generated.split('T')[0];
+        }
+
+        // Activate tab from hash
+        var initialTab = getTabFromHash();
+        activateTab(initialTab);
+
+    })();
+    </script>
+</body>
+</html>
